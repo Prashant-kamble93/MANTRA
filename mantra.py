@@ -71,18 +71,22 @@ while True:
         print("""
 MANTRA Commands:
 
-  help          - Show commands
-  status        - Show MANTRA status
-  name          - Show your name
-  notes         - Show saved notes
-  remember X    - Save a note
-  forget X      - Delete note number X
-  tasks         - Show tasks
-  add task X    - Add a task
-  done X        - Complete task number X
-  time          - Show current time
-  date          - Show today's date
-  exit          - Exit MANTRA
+  help              - Show commands
+  status            - Show MANTRA status
+  name              - Show your name
+  notes             - Show saved notes
+  preferences       - Show saved preferences
+  remember X        - Save a note
+  forget X          - Delete note number X
+  clear notes       - Clear all notes
+  clear preferences - Clear all preferences
+  clear tasks       - Clear all tasks
+  tasks             - Show tasks
+  add task X        - Add a task
+  done X            - Complete task number X
+  time              - Show current time
+  date              - Show today's date
+  exit              - Exit MANTRA
 """)
         continue
 
@@ -99,10 +103,12 @@ Memory  : Active
 Name    : {}
 Notes   : {}
 Tasks   : {}
+Preferences : {}
 """.format(
             memory["name"] or "Not set",
             len(memory["notes"]),
-            len(memory["tasks"])
+            len(memory["tasks"]),
+            len(memory["preferences"])
         ))
         continue
 
@@ -180,18 +186,22 @@ Tasks   : {}
 
             # Detect simple preference:
             # "remember my favorite food is misal pav"
+
             lower_note = note.lower()
 
             if lower_note.startswith("my favorite ") and " is " in lower_note:
 
                 preference_part = lower_note[12:]
+
                 key, value = preference_part.split(" is ", 1)
 
                 key = key.strip().replace(" ", "_")
                 value = value.strip()
 
                 if key and value:
-                    memory["preferences"][f"favorite_{key}"] = value
+                    memory["preferences"][
+                        f"favorite_{key}"
+                    ] = value
 
             save_memory()
 
@@ -204,22 +214,136 @@ Tasks   : {}
     elif command == "preferences":
 
         if not memory["preferences"]:
-            print("MANTRA: No preferences saved yet, Sir.")
+            print(
+                "MANTRA: No preferences saved yet, Sir."
+            )
+
         else:
             print("MANTRA: Your preferences:")
 
             for key, value in memory["preferences"].items():
-                display_key = key.replace("_", " ").title()
-                print(f"  {display_key}: {value}")
+
+                display_key = key.replace(
+                    "_", " "
+                ).title()
+
+                print(
+                    f"  {display_key}: {value}"
+                )
 
         continue
 
-    # ---------- FORGET ----------
+    # ---------- CLEAR NOTES ----------
+
+    elif command == "clear notes":
+
+        if not memory["notes"]:
+            print(
+                "MANTRA: There are no notes to clear, Sir."
+            )
+            continue
+
+        print(
+            "MANTRA: This will delete all saved notes. "
+            "Type 'yes' to confirm, Sir."
+        )
+
+        confirmation = input("Confirm: ").strip().lower()
+
+        if confirmation == "yes":
+
+            memory["notes"] = []
+
+            save_memory()
+
+            print(
+                "MANTRA: All notes cleared, Sir."
+            )
+
+        else:
+            print(
+                "MANTRA: Cancelled. Your notes are safe, Sir."
+            )
+
+        continue
+
+    # ---------- CLEAR PREFERENCES ----------
+
+    elif command == "clear preferences":
+
+        if not memory["preferences"]:
+            print(
+                "MANTRA: There are no preferences to clear, Sir."
+            )
+            continue
+
+        print(
+            "MANTRA: This will delete all saved preferences. "
+            "Type 'yes' to confirm, Sir."
+        )
+
+        confirmation = input("Confirm: ").strip().lower()
+
+        if confirmation == "yes":
+
+            memory["preferences"] = {}
+
+            save_memory()
+
+            print(
+                "MANTRA: All preferences cleared, Sir."
+            )
+
+        else:
+            print(
+                "MANTRA: Cancelled. Your preferences are safe, Sir."
+            )
+
+        continue
+
+    # ---------- CLEAR TASKS ----------
+
+    elif command == "clear tasks":
+
+        if not memory["tasks"]:
+            print(
+                "MANTRA: There are no tasks to clear, Sir."
+            )
+            continue
+
+        print(
+            "MANTRA: This will delete all saved tasks. "
+            "Type 'yes' to confirm, Sir."
+        )
+
+        confirmation = input("Confirm: ").strip().lower()
+
+        if confirmation == "yes":
+
+            memory["tasks"] = []
+
+            save_memory()
+
+            print(
+                "MANTRA: All tasks cleared, Sir."
+            )
+
+        else:
+            print(
+                "MANTRA: Cancelled. Your tasks are safe, Sir."
+            )
+
+        continue
+
+    # ---------- FORGET NOTE ----------
 
     elif command.startswith("forget "):
 
         try:
-            index = int(user_input[7:].strip()) - 1
+
+            index = int(
+                user_input[7:].strip()
+            ) - 1
 
             if 0 <= index < len(memory["notes"]):
 
@@ -232,11 +356,13 @@ Tasks   : {}
                 )
 
             else:
+
                 print(
                     "MANTRA: That note doesn't exist, Sir."
                 )
 
         except ValueError:
+
             print(
                 "MANTRA: Please use 'forget 1', "
                 "'forget 2', etc., Sir."
@@ -249,20 +375,42 @@ Tasks   : {}
     elif command == "tasks":
 
         if not memory["tasks"]:
-            print("MANTRA: No tasks yet, Sir.")
+
+            print(
+                "MANTRA: No tasks yet, Sir."
+            )
 
         else:
-            print("MANTRA: Your tasks:")
 
-            for i, task in enumerate(memory["tasks"], 1):
+            print(
+                "MANTRA: Your tasks:"
+            )
+
+            for i, task in enumerate(
+                memory["tasks"], 1
+            ):
 
                 if isinstance(task, dict):
-                    symbol = "✓" if task.get("done") else "☐"
-                    text = task.get("text", "")
-                    print(f"  {i}. {symbol} {text}")
+
+                    symbol = (
+                        "✓"
+                        if task.get("done")
+                        else "☐"
+                    )
+
+                    text = task.get(
+                        "text", ""
+                    )
+
+                    print(
+                        f"  {i}. {symbol} {text}"
+                    )
 
                 else:
-                    print(f"  {i}. ☐ {task}")
+
+                    print(
+                        f"  {i}. ☐ {task}"
+                    )
 
         continue
 
@@ -274,10 +422,12 @@ Tasks   : {}
 
         if task:
 
-            memory["tasks"].append({
-                "text": task,
-                "done": False
-            })
+            memory["tasks"].append(
+                {
+                    "text": task,
+                    "done": False
+                }
+            )
 
             save_memory()
 
@@ -292,18 +442,22 @@ Tasks   : {}
     elif command.startswith("done "):
 
         try:
-            index = int(user_input[5:].strip()) - 1
+
+            index = int(
+                user_input[5:].strip()
+            ) - 1
 
             if 0 <= index < len(memory["tasks"]):
 
                 task = memory["tasks"][index]
 
                 if isinstance(task, dict):
+
                     task["done"] = True
                     completed = task["text"]
 
                 else:
-                    # Convert old task format into new format
+
                     completed = task
 
                     memory["tasks"][index] = {
@@ -318,11 +472,13 @@ Tasks   : {}
                 )
 
             else:
+
                 print(
                     "MANTRA: That task doesn't exist, Sir."
                 )
 
         except ValueError:
+
             print(
                 "MANTRA: Please use 'done 1', "
                 "'done 2', etc., Sir."
@@ -354,7 +510,9 @@ Tasks   : {}
             "Sorry Sir, I couldn't process that request."
         )
 
-        print(f"MANTRA ERROR: {e}")
+        print(
+            f"MANTRA ERROR: {e}"
+        )
 
     messages.append(
         {
@@ -363,5 +521,8 @@ Tasks   : {}
         }
     )
 
-    print("MANTRA:", reply)
+    print(
+        "MANTRA:",
+        reply
+    )
 
