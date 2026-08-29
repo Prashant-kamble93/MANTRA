@@ -55,39 +55,37 @@ print("MANTRA: Hello Sir! Type 'help' for commands or 'exit' to quit.")
 # ---------- MAIN LOOP ----------
 
 while True:
-
     user_input = input("You: ").strip()
     command = user_input.lower()
 
-    # ---------- EXIT ----------
-
+    # EXIT
     if command == "exit":
         print("MANTRA: Goodbye Sir!")
         break
 
-    # ---------- HELP ----------
-
+    # HELP
     elif command == "help":
         print("""
 MANTRA Commands:
 
-  help          - Show commands
-  status        - Show MANTRA status
-  name          - Show your name
-  notes         - Show saved notes
-  remember X    - Save a note
-  forget X      - Delete note number X
-  tasks         - Show tasks
-  add task X    - Add a task
-  done X        - Complete task number X
-  time          - Show current time
-  date          - Show today's date
-  exit          - Exit MANTRA
+  help            - Show commands
+  status          - Show MANTRA status
+  name            - Show your name
+  favorite color  - Show favorite color
+  notes           - Show saved notes
+  remember X      - Save a note
+  forget X        - Delete note number X
+  tasks           - Show tasks
+  task            - Show tasks
+  add task X      - Add a task
+  done X          - Complete task number X
+  time            - Show current time
+  date            - Show today's date
+  exit            - Exit MANTRA
 """)
         continue
 
-    # ---------- STATUS ----------
-
+    # STATUS
     elif command == "status":
         print("""
 MANTRA STATUS
@@ -106,8 +104,7 @@ Tasks   : {}
         ))
         continue
 
-    # ---------- TIME ----------
-
+    # TIME
     elif command == "time":
         now = datetime.now()
         print(
@@ -116,8 +113,7 @@ Tasks   : {}
         )
         continue
 
-    # ---------- DATE ----------
-
+    # DATE
     elif command == "date":
         now = datetime.now()
         print(
@@ -126,12 +122,12 @@ Tasks   : {}
         )
         continue
 
-    # ---------- NAME ----------
-
+    # NAME
     elif command == "name":
         if memory["name"]:
             print(
-                f"MANTRA: Your name is {memory['name']}, Sir."
+                f"MANTRA: Your name is "
+                f"{memory['name']}, Sir."
             )
         else:
             print(
@@ -139,8 +135,7 @@ Tasks   : {}
             )
         continue
 
-    # ---------- SAVE NAME ----------
-
+    # SAVE NAME
     elif command.startswith("my name is "):
         name = user_input[11:].strip()
 
@@ -150,36 +145,69 @@ Tasks   : {}
 
             print(
                 f"MANTRA: Got it, Sir. "
-                f"I'll remember your name is {memory['name']}."
+                f"I'll remember your name is "
+                f"{memory['name']}."
             )
+
         continue
 
-    # ---------- SHOW NOTES ----------
+    # FAVORITE COLOR
+    elif command == "favorite color":
+        color = memory["preferences"].get("favorite_color")
 
+        if color:
+            print(
+                f"MANTRA: Your favorite color is "
+                f"{color}, Sir."
+            )
+        else:
+            print(
+                "MANTRA: I don't know your favorite "
+                "color yet, Sir."
+            )
+
+        continue
+
+    # SHOW NOTES
     elif command == "notes":
         if not memory["notes"]:
             print("MANTRA: No notes saved yet, Sir.")
         else:
             print("MANTRA: Your saved notes:")
+
             for i, note in enumerate(memory["notes"], 1):
                 print(f"  {i}. {note}")
+
         continue
 
-    # ---------- REMEMBER ----------
-
+    # REMEMBER
     elif command.startswith("remember "):
         note = user_input[9:].strip()
 
-        if note and note not in memory["notes"]:
-            memory["notes"].append(note)
-            save_memory()
-            print("MANTRA: I'll remember that, Sir.")
-        elif note in memory["notes"]:
-            print("MANTRA: I already remember that, Sir.")
+        if note:
+            # Save favorite color as a preference
+            if note.lower().startswith("my favorite color is "):
+                color = note[21:].strip()
+
+                memory["preferences"]["favorite_color"] = color
+                save_memory()
+
+                print(
+                    f"MANTRA: I'll remember your "
+                    f"favorite color is {color}, Sir."
+                )
+
+            else:
+                memory["notes"].append(note)
+                save_memory()
+
+                print(
+                    "MANTRA: I'll remember that, Sir."
+                )
+
         continue
 
-    # ---------- FORGET ----------
-
+    # FORGET
     elif command.startswith("forget "):
         try:
             index = int(user_input[7:].strip()) - 1
@@ -204,19 +232,23 @@ Tasks   : {}
 
         continue
 
-    # ---------- SHOW TASKS ----------
-
-    elif command == "tasks":
+    # SHOW TASKS
+    elif command in ["task", "tasks"]:
         if not memory["tasks"]:
             print("MANTRA: No tasks yet, Sir.")
         else:
             print("MANTRA: Your tasks:")
+
             for i, task in enumerate(memory["tasks"], 1):
-                print(f"  {i}. {task}")
+                if task.startswith("[DONE] "):
+                    display_task = task[7:]
+                    print(f"  {i}. ✓ {display_task}")
+                else:
+                    print(f"  {i}. ☐ {task}")
+
         continue
 
-    # ---------- ADD TASK ----------
-
+    # ADD TASK
     elif command.startswith("add task "):
         task = user_input[9:].strip()
 
@@ -227,21 +259,32 @@ Tasks   : {}
             print(
                 f"MANTRA: Task added, Sir: {task}"
             )
+
         continue
 
-    # ---------- COMPLETE TASK ----------
-
+    # COMPLETE TASK
     elif command.startswith("done "):
         try:
             index = int(user_input[5:].strip()) - 1
 
             if 0 <= index < len(memory["tasks"]):
-                completed = memory["tasks"].pop(index)
-                save_memory()
+                completed = memory["tasks"][index]
 
-                print(
-                    f"MANTRA: Task completed, Sir: {completed}"
-                )
+                if completed.startswith("[DONE] "):
+                    print(
+                        "MANTRA: That task is already "
+                        "completed, Sir."
+                    )
+                else:
+                    memory["tasks"][index] = (
+                        f"[DONE] {completed}"
+                    )
+                    save_memory()
+
+                    print(
+                        f"MANTRA: Task completed, Sir: "
+                        f"{completed}"
+                    )
             else:
                 print(
                     "MANTRA: That task doesn't exist, Sir."
@@ -253,44 +296,6 @@ Tasks   : {}
                 "'done 2', etc., Sir."
             )
 
-        continue
-
-    # ---------- SMART MEMORY LOOKUP ----------
-
-    elif "what is my name" in command:
-        if memory["name"]:
-            print(
-                f"MANTRA: Your name is {memory['name']}, Sir."
-            )
-        else:
-            print(
-                "MANTRA: I don't know your name yet, Sir."
-            )
-        continue
-
-    elif "favorite color" in command:
-        matches = [
-            note for note in memory["notes"]
-            if "favorite color" in note.lower()
-        ]
-
-        if matches:
-            print(
-                "MANTRA: Your favorite color is blue, Sir."
-            )
-        else:
-            print(
-                "MANTRA: I don't know your favorite color yet, Sir."
-            )
-        continue
-
-    elif "what are my tasks" in command:
-        if memory["tasks"]:
-            print("MANTRA: Your tasks are:")
-            for i, task in enumerate(memory["tasks"], 1):
-                print(f"  {i}. {task}")
-        else:
-            print("MANTRA: You have no tasks, Sir.")
         continue
 
     # ---------- NORMAL AI CHAT ----------
@@ -308,7 +313,11 @@ Tasks   : {}
         reply = response["message"]["content"]
 
     except Exception as e:
-        reply = "Sorry Sir, I couldn't process that request."
+        reply = (
+            "Sorry Sir, I couldn't process "
+            "that request."
+        )
+
         print(f"MANTRA ERROR: {e}")
 
     messages.append(
@@ -316,4 +325,3 @@ Tasks   : {}
     )
 
     print("MANTRA:", reply)
-
