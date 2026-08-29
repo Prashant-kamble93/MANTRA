@@ -72,6 +72,7 @@ while True:
 MANTRA Commands:
 
   help              - Show commands
+  about             - Show MANTRA information
   status            - Show MANTRA status
   name              - Show your name
   notes             - Show saved notes
@@ -87,6 +88,22 @@ MANTRA Commands:
   time              - Show current time
   date              - Show today's date
   exit              - Exit MANTRA
+""")
+        continue
+
+    # ---------- ABOUT ----------
+
+    elif command == "about":
+        print("""
+MANTRA: About
+--------------
+Name    : MANTRA
+Version : 0.2
+Model   : TinyLlama
+Engine  : Ollama
+Mode    : CPU
+Memory  : JSON
+Status  : Online
 """)
         continue
 
