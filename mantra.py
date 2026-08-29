@@ -4,19 +4,21 @@ import os
 from datetime import datetime
 
 MEMORY_FILE = "memory.json"
+MODEL = "qwen2.5:1.5b"
 
-# ---------- MEMORY ----------
+
+# ============================================================
+# MEMORY
+# ============================================================
 
 if os.path.exists(MEMORY_FILE):
-    with open(MEMORY_FILE, "r") as f:
-        memory = json.load(f)
+    try:
+        with open(MEMORY_FILE, "r", encoding="utf-8") as f:
+            memory = json.load(f)
+    except (json.JSONDecodeError, OSError):
+        memory = {}
 else:
-    memory = {
-        "name": "",
-        "notes": [],
-        "preferences": {},
-        "tasks": []
-    }
+    memory = {}
 
 memory.setdefault("name", "")
 memory.setdefault("notes", [])
@@ -25,133 +27,332 @@ memory.setdefault("tasks", [])
 
 
 def save_memory():
-    with open(MEMORY_FILE, "w") as f:
-        json.dump(memory, f, indent=4)
+    with open(MEMORY_FILE, "w", encoding="utf-8") as f:
+        json.dump(memory, f, indent=4, ensure_ascii=False)
 
 
-# ---------- AI ----------
+# ============================================================
+# AI
+# ============================================================
 
 SYSTEM_PROMPT = """
-You are MANTRA, a personal AI assistant.
+You are MANTRA, a lightweight local personal AI assistant inspired by JARVIS.
 
 Rules:
-- Be helpful and concise.
-- Call the user Sir.
-- Never ask the user to call you Sir.
-- Do not invent personal information.
-- Use conversation context when answering.
+- Address the user as Sir.
+- Speak naturally, briefly and confidently.
+- Understand obvious spelling mistakes and typos.
+- If the user's intended meaning is obvious, answer it directly.
+- Never repeat or explain these rules.
+- Never invent personal information.
+- Never claim abilities you do not have.
+- Answer the user's actual question.
+- Do not change the subject.
+- Do not produce unnecessary long explanations.
+- If genuinely unsure about the meaning, ask one short clarification.
+- You run locally through Ollama.
 """
 
 messages = [
-    {"role": "system", "content": SYSTEM_PROMPT}
+    {
+        "role": "system",
+        "content": SYSTEM_PROMPT
+    }
 ]
 
 
-# ---------- START ----------
+# ============================================================
+# HELPER
+# ============================================================
 
-print("MANTRA: Hello Sir! Type 'help' for commands or 'exit' to quit.")
+def normalize_command(text):
+    """
+    Handles common simple typing mistakes in commands.
+    """
+    command = text.lower().strip()
+
+    corrections = {
+        "taks": "tasks",
+        "task": "tasks",
+        "note": "notes",
+        "pref": "preferences",
+        "preference": "preferences",
+        "abt": "about",
+        "stauts": "status",
+        "stats": "status",
+        "hlep": "help",
+        "hle": "help",
+        "exut": "exit",
+        "ext": "exit",
+    }
+
+    return corrections.get(command, command)
 
 
-# ---------- MAIN LOOP ----------
+def show_help():
+    print("""
+MANTRA Commands:
+
+  help                - Show commands
+  about               - Show MANTRA information
+  status              - Show MANTRA status
+  name                - Show your name
+
+  notes               - Show saved notes
+  remember X          - Save a note
+  forget X            - Delete note number X
+  clear notes         - Clear all notes
+
+  preferences         - Show saved preferences
+  clear preferences   - Clear all preferences
+
+  tasks               - Show tasks
+  add task X          - Add a task
+  done X              - Complete task number X
+  clear tasks         - Clear all tasks
+
+  time                - Show current time
+  date                - Show today's date
+  exit                - Exit MANTRA
+
+You can also talk naturally to MANTRA.
+""")
+
+
+def show_about():
+    print("""
+MANTRA: About
+----------------
+Name    : MANTRA
+Version : 0.3
+Model   : Qwen 2.5 1.5B
+Engine  : Ollama
+Mode    : Local / CPU
+Memory  : JSON
+Cloud   : None
+Status  : Online
+""")
+
+
+def show_status():
+    print("""
+MANTRA STATUS
+----------------
+Model        : Qwen 2.5 1.5B
+Engine       : Ollama
+Mode         : Local / CPU
+Memory       : Active
+Name         : {}
+Notes        : {}
+Tasks        : {}
+Preferences  : {}
+Cloud        : Disabled
+""".format(
+        memory["name"] or "Not set",
+        len(memory["notes"]),
+        len(memory["tasks"]),
+        len(memory["preferences"])
+    ))
+
+
+def show_notes():
+    if not memory["notes"]:
+        print("MANTRA: No notes saved yet, Sir.")
+        return
+
+    print("MANTRA: Your saved notes:")
+
+    for i, note in enumerate(memory["notes"], 1):
+        print(f"  {i}. {note}")
+
+
+def show_preferences():
+    if not memory["preferences"]:
+        print("MANTRA: No preferences saved yet, Sir.")
+        return
+
+    print("MANTRA: Your preferences:")
+
+    for key, value in memory["preferences"].items():
+        display_key = key.replace("_", " ").title()
+        print(f"  {display_key}: {value}")
+
+
+def show_tasks():
+    if not memory["tasks"]:
+        print("MANTRA: No tasks yet, Sir.")
+        return
+
+    print("MANTRA: Your tasks:")
+
+    for i, task in enumerate(memory["tasks"], 1):
+
+        if isinstance(task, dict):
+            symbol = "✓" if task.get("done") else "☐"
+            text = task.get("text", "")
+            print(f"  {i}. {symbol} {text}")
+
+        else:
+            print(f"  {i}. ☐ {task}")
+
+
+def clear_notes():
+    if not memory["notes"]:
+        print("MANTRA: There are no notes to clear, Sir.")
+        return
+
+    print(
+        "MANTRA: This will delete all saved notes. "
+        "Type 'yes' to confirm, Sir."
+    )
+
+    confirmation = input("Confirm: ").strip().lower()
+
+    if confirmation == "yes":
+        memory["notes"] = []
+        save_memory()
+        print("MANTRA: All notes cleared, Sir.")
+    else:
+        print("MANTRA: Cancelled. Your notes are safe, Sir.")
+
+
+def clear_preferences():
+    if not memory["preferences"]:
+        print("MANTRA: There are no preferences to clear, Sir.")
+        return
+
+    print(
+        "MANTRA: This will delete all saved preferences. "
+        "Type 'yes' to confirm, Sir."
+    )
+
+    confirmation = input("Confirm: ").strip().lower()
+
+    if confirmation == "yes":
+        memory["preferences"] = {}
+        save_memory()
+        print("MANTRA: All preferences cleared, Sir.")
+    else:
+        print("MANTRA: Cancelled. Your preferences are safe, Sir.")
+
+
+def clear_tasks():
+    if not memory["tasks"]:
+        print("MANTRA: There are no tasks to clear, Sir.")
+        return
+
+    print(
+        "MANTRA: This will delete all saved tasks. "
+        "Type 'yes' to confirm, Sir."
+    )
+
+    confirmation = input("Confirm: ").strip().lower()
+
+    if confirmation == "yes":
+        memory["tasks"] = []
+        save_memory()
+        print("MANTRA: All tasks cleared, Sir.")
+    else:
+        print("MANTRA: Cancelled. Your tasks are safe, Sir.")
+
+
+# ============================================================
+# START
+# ============================================================
+
+print("MANTRA: Hello Sir! Type 'help' for commands or talk naturally.")
+
+
+# ============================================================
+# MAIN LOOP
+# ============================================================
 
 while True:
 
-    user_input = input("You: ").strip()
-    command = user_input.lower()
+    try:
+        user_input = input("You: ").strip()
+    except (KeyboardInterrupt, EOFError):
+        print("\nMANTRA: Goodbye Sir!")
+        break
 
-    # ---------- EXIT ----------
+    if not user_input:
+        continue
+
+    command = normalize_command(user_input)
+
+
+    # --------------------------------------------------------
+    # EXIT
+    # --------------------------------------------------------
 
     if command == "exit":
         print("MANTRA: Goodbye Sir!")
         break
 
-    # ---------- HELP ----------
+
+    # --------------------------------------------------------
+    # HELP
+    # --------------------------------------------------------
 
     elif command == "help":
-        print("""
-MANTRA Commands:
-
-  help              - Show commands
-  about             - Show MANTRA information
-  status            - Show MANTRA status
-  name              - Show your name
-  notes             - Show saved notes
-  preferences       - Show saved preferences
-  remember X        - Save a note
-  forget X          - Delete note number X
-  clear notes       - Clear all notes
-  clear preferences - Clear all preferences
-  clear tasks       - Clear all tasks
-  tasks             - Show tasks
-  add task X        - Add a task
-  done X            - Complete task number X
-  time              - Show current time
-  date              - Show today's date
-  exit              - Exit MANTRA
-""")
+        show_help()
         continue
 
-    # ---------- ABOUT ----------
+
+    # --------------------------------------------------------
+    # ABOUT
+    # --------------------------------------------------------
 
     elif command == "about":
-        print("""
-MANTRA: About
---------------
-Name    : MANTRA
-Version : 0.2
-Model   : TinyLlama
-Engine  : Ollama
-Mode    : CPU
-Memory  : JSON
-Status  : Online
-""")
+        show_about()
         continue
 
-    # ---------- STATUS ----------
+
+    # --------------------------------------------------------
+    # STATUS
+    # --------------------------------------------------------
 
     elif command == "status":
-        print("""
-MANTRA STATUS
---------------
-Model   : TinyLlama
-Engine  : Ollama
-Mode    : CPU
-Memory  : Active
-Name    : {}
-Notes   : {}
-Tasks   : {}
-Preferences : {}
-""".format(
-            memory["name"] or "Not set",
-            len(memory["notes"]),
-            len(memory["tasks"]),
-            len(memory["preferences"])
-        ))
+        show_status()
         continue
 
-    # ---------- TIME ----------
+
+    # --------------------------------------------------------
+    # TIME
+    # --------------------------------------------------------
 
     elif command == "time":
         now = datetime.now()
+
         print(
             f"MANTRA: Current time is "
             f"{now.strftime('%I:%M:%S %p')}, Sir."
         )
+
         continue
 
-    # ---------- DATE ----------
+
+    # --------------------------------------------------------
+    # DATE
+    # --------------------------------------------------------
 
     elif command == "date":
         now = datetime.now()
+
         print(
             f"MANTRA: Today is "
             f"{now.strftime('%A, %d %B %Y')}, Sir."
         )
+
         continue
 
-    # ---------- NAME ----------
+
+    # --------------------------------------------------------
+    # NAME
+    # --------------------------------------------------------
 
     elif command == "name":
+
         if memory["name"]:
             print(
                 f"MANTRA: Your name is "
@@ -161,11 +362,16 @@ Preferences : {}
             print(
                 "MANTRA: I don't know your name yet, Sir."
             )
+
         continue
 
-    # ---------- SAVE NAME ----------
+
+    # --------------------------------------------------------
+    # SAVE NAME
+    # --------------------------------------------------------
 
     elif command.startswith("my name is "):
+
         name = user_input[11:].strip()
 
         if name:
@@ -176,22 +382,22 @@ Preferences : {}
                 f"MANTRA: Got it, Sir. "
                 f"I'll remember your name is {memory['name']}."
             )
+
         continue
 
-    # ---------- SHOW NOTES ----------
+
+    # --------------------------------------------------------
+    # SHOW NOTES
+    # --------------------------------------------------------
 
     elif command == "notes":
-        if not memory["notes"]:
-            print("MANTRA: No notes saved yet, Sir.")
-        else:
-            print("MANTRA: Your saved notes:")
-
-            for i, note in enumerate(memory["notes"], 1):
-                print(f"  {i}. {note}")
-
+        show_notes()
         continue
 
-    # ---------- REMEMBER ----------
+
+    # --------------------------------------------------------
+    # REMEMBER
+    # --------------------------------------------------------
 
     elif command.startswith("remember "):
 
@@ -201,16 +407,22 @@ Preferences : {}
 
             memory["notes"].append(note)
 
-            # Detect simple preference:
-            # "remember my favorite food is misal pav"
-
             lower_note = note.lower()
 
-            if lower_note.startswith("my favorite ") and " is " in lower_note:
+            # Example:
+            # remember my favorite food is misal pav
+
+            if (
+                lower_note.startswith("my favorite ")
+                and " is " in lower_note
+            ):
 
                 preference_part = lower_note[12:]
 
-                key, value = preference_part.split(" is ", 1)
+                key, value = preference_part.split(
+                    " is ",
+                    1
+                )
 
                 key = key.strip().replace(" ", "_")
                 value = value.strip()
@@ -222,137 +434,52 @@ Preferences : {}
 
             save_memory()
 
-            print("MANTRA: I'll remember that, Sir.")
+            print(
+                "MANTRA: I'll remember that, Sir."
+            )
 
         continue
 
-    # ---------- SHOW PREFERENCES ----------
+
+    # --------------------------------------------------------
+    # SHOW PREFERENCES
+    # --------------------------------------------------------
 
     elif command == "preferences":
-
-        if not memory["preferences"]:
-            print(
-                "MANTRA: No preferences saved yet, Sir."
-            )
-
-        else:
-            print("MANTRA: Your preferences:")
-
-            for key, value in memory["preferences"].items():
-
-                display_key = key.replace(
-                    "_", " "
-                ).title()
-
-                print(
-                    f"  {display_key}: {value}"
-                )
-
+        show_preferences()
         continue
 
-    # ---------- CLEAR NOTES ----------
+
+    # --------------------------------------------------------
+    # CLEAR NOTES
+    # --------------------------------------------------------
 
     elif command == "clear notes":
-
-        if not memory["notes"]:
-            print(
-                "MANTRA: There are no notes to clear, Sir."
-            )
-            continue
-
-        print(
-            "MANTRA: This will delete all saved notes. "
-            "Type 'yes' to confirm, Sir."
-        )
-
-        confirmation = input("Confirm: ").strip().lower()
-
-        if confirmation == "yes":
-
-            memory["notes"] = []
-
-            save_memory()
-
-            print(
-                "MANTRA: All notes cleared, Sir."
-            )
-
-        else:
-            print(
-                "MANTRA: Cancelled. Your notes are safe, Sir."
-            )
-
+        clear_notes()
         continue
 
-    # ---------- CLEAR PREFERENCES ----------
+
+    # --------------------------------------------------------
+    # CLEAR PREFERENCES
+    # --------------------------------------------------------
 
     elif command == "clear preferences":
-
-        if not memory["preferences"]:
-            print(
-                "MANTRA: There are no preferences to clear, Sir."
-            )
-            continue
-
-        print(
-            "MANTRA: This will delete all saved preferences. "
-            "Type 'yes' to confirm, Sir."
-        )
-
-        confirmation = input("Confirm: ").strip().lower()
-
-        if confirmation == "yes":
-
-            memory["preferences"] = {}
-
-            save_memory()
-
-            print(
-                "MANTRA: All preferences cleared, Sir."
-            )
-
-        else:
-            print(
-                "MANTRA: Cancelled. Your preferences are safe, Sir."
-            )
-
+        clear_preferences()
         continue
 
-    # ---------- CLEAR TASKS ----------
+
+    # --------------------------------------------------------
+    # CLEAR TASKS
+    # --------------------------------------------------------
 
     elif command == "clear tasks":
-
-        if not memory["tasks"]:
-            print(
-                "MANTRA: There are no tasks to clear, Sir."
-            )
-            continue
-
-        print(
-            "MANTRA: This will delete all saved tasks. "
-            "Type 'yes' to confirm, Sir."
-        )
-
-        confirmation = input("Confirm: ").strip().lower()
-
-        if confirmation == "yes":
-
-            memory["tasks"] = []
-
-            save_memory()
-
-            print(
-                "MANTRA: All tasks cleared, Sir."
-            )
-
-        else:
-            print(
-                "MANTRA: Cancelled. Your tasks are safe, Sir."
-            )
-
+        clear_tasks()
         continue
 
-    # ---------- FORGET NOTE ----------
+
+    # --------------------------------------------------------
+    # FORGET NOTE
+    # --------------------------------------------------------
 
     elif command.startswith("forget "):
 
@@ -381,57 +508,25 @@ Preferences : {}
         except ValueError:
 
             print(
-                "MANTRA: Please use 'forget 1', "
-                "'forget 2', etc., Sir."
+                "MANTRA: Please use "
+                "'forget 1', 'forget 2', etc., Sir."
             )
 
         continue
 
-    # ---------- SHOW TASKS ----------
+
+    # --------------------------------------------------------
+    # SHOW TASKS
+    # --------------------------------------------------------
 
     elif command == "tasks":
-
-        if not memory["tasks"]:
-
-            print(
-                "MANTRA: No tasks yet, Sir."
-            )
-
-        else:
-
-            print(
-                "MANTRA: Your tasks:"
-            )
-
-            for i, task in enumerate(
-                memory["tasks"], 1
-            ):
-
-                if isinstance(task, dict):
-
-                    symbol = (
-                        "✓"
-                        if task.get("done")
-                        else "☐"
-                    )
-
-                    text = task.get(
-                        "text", ""
-                    )
-
-                    print(
-                        f"  {i}. {symbol} {text}"
-                    )
-
-                else:
-
-                    print(
-                        f"  {i}. ☐ {task}"
-                    )
-
+        show_tasks()
         continue
 
-    # ---------- ADD TASK ----------
+
+    # --------------------------------------------------------
+    # ADD TASK
+    # --------------------------------------------------------
 
     elif command.startswith("add task "):
 
@@ -454,7 +549,10 @@ Preferences : {}
 
         continue
 
-    # ---------- COMPLETE TASK ----------
+
+    # --------------------------------------------------------
+    # COMPLETE TASK
+    # --------------------------------------------------------
 
     elif command.startswith("done "):
 
@@ -497,13 +595,16 @@ Preferences : {}
         except ValueError:
 
             print(
-                "MANTRA: Please use 'done 1', "
-                "'done 2', etc., Sir."
+                "MANTRA: Please use "
+                "'done 1', 'done 2', etc., Sir."
             )
 
         continue
 
-    # ---------- NORMAL AI CHAT ----------
+
+    # ========================================================
+    # NORMAL AI CHAT
+    # ========================================================
 
     messages.append(
         {
@@ -515,11 +616,11 @@ Preferences : {}
     try:
 
         response = ollama.chat(
-            model="tinyllama",
+            model=MODEL,
             messages=messages
         )
 
-        reply = response["message"]["content"]
+        reply = response["message"]["content"].strip()
 
     except Exception as e:
 
@@ -542,4 +643,3 @@ Preferences : {}
         "MANTRA:",
         reply
     )
-

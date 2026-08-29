@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MANTRA v0.3</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+
+<body>
+
+<div class="app">
+
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+
+        <div class="brand">
+            <div class="logo">M</div>
+            <div>
+                <h1>MANTRA</h1>
+                <span>Personal AI Assistant</span>
+            </div>
+        </div>
+
+        <div class="status">
+            <span class="status-dot"></span>
+            SYSTEM ONLINE
+        </div>
+
+        <nav>
+            <button class="nav-item active" onclick="showSection('chat')">
+                💬 Chat
+            </button>
+
+            <button class="nav-item" onclick="showSection('memory')">
+                🧠 Memory
+            </button>
+
+            <button class="nav-item" onclick="showSection('tasks')">
+                ✅ Tasks
+            </button>
+
+            <button class="nav-item" onclick="showSection('notes')">
+                📝 Notes
+            </button>
+        </nav>
+
+        <div class="system-info">
+            <div>MODEL</div>
+            <strong>TinyLlama</strong>
+
+            <div>ENGINE</div>
+            <strong>Ollama</strong>
+
+            <div>MODE</div>
+            <strong>LOCAL / CPU</strong>
+        </div>
+
+    </aside>
+
+
+    <!-- MAIN -->
+    <main class="main">
+
+        <!-- HEADER -->
+        <header class="topbar">
+
+            <div>
+                <h2>MANTRA</h2>
+                <p>Your local personal AI assistant</p>
+            </div>
+
+            <div class="online">
+                <span></span> ONLINE
+            </div>
+
+        </header>
+
+
+        <!-- CHAT -->
+        <section id="chat" class="section active-section">
+
+            <div id="chatBox" class="chat-box">
+
+                <div class="message mantra-message">
+
+                    <div class="avatar">M</div>
+
+                    <div class="bubble">
+
+                        <div class="sender">
+                            MANTRA
+                        </div>
+
+                        Hello Sir. 👋<br>
+                        How can I assist you?
+
+                    </div>
+
+                </div>
+
+            </div>
+
+
+            <div class="input-area">
+
+                <input
+                    id="messageInput"
+                    type="text"
+                    placeholder="Ask MANTRA anything..."
+                    autocomplete="off"
+                >
+
+                <button onclick="sendMessage()">
+                    SEND
+                </button>
+
+            </div>
+
+        </section>
+
+
+        <!-- MEMORY -->
+        <section id="memory" class="section">
+
+            <div class="panel">
+
+                <h2>🧠 Memory</h2>
+
+                <div class="memory-card">
+                    <span>Name</span>
+                    <strong id="memoryName">
+                        {{ memory.name or "Not set" }}
+                    </strong>
+                </div>
+
+                <div class="memory-card">
+                    <span>Notes</span>
+                    <strong>
+                        {{ memory.notes|length }}
+                    </strong>
+                </div>
+
+                <div class="memory-card">
+                    <span>Tasks</span>
+                    <strong>
+                        {{ memory.tasks|length }}
+                    </strong>
+                </div>
+
+                <div class="memory-card">
+                    <span>Preferences</span>
+                    <strong>
+                        {{ memory.preferences|length }}
+                    </strong>
+                </div>
+
+            </div>
+
+        </section>
+
+
+        <!-- TASKS -->
+        <section id="tasks" class="section">
+
+            <div class="panel">
+
+                <h2>✅ Tasks</h2>
+
+                <div id="taskList">
+
+                    {% if memory.tasks %}
+
+                        {% for task in memory.tasks %}
+
+                            <div class="list-item">
+
+                                {% if task is mapping %}
+
+                                    {% if task.done %}
+                                        ✓
+                                    {% else %}
+                                        ☐
+                                    {% endif %}
+
+                                    {{ task.text }}
+
+                                {% else %}
+
+                                    ☐ {{ task }}
+
+                                {% endif %}
+
+                            </div>
+
+                        {% endfor %}
+
+                    {% else %}
+
+                        <p class="empty">
+                            No tasks yet, Sir.
+                        </p>
+
+                    {% endif %}
+
+                </div>
+
+            </div>
+
+        </section>
+
+
+        <!-- NOTES -->
+        <section id="notes" class="section">
+
+            <div class="panel">
+
+                <h2>📝 Notes</h2>
+
+                {% if memory.notes %}
+
+                    {% for note in memory.notes %}
+
+                        <div class="list-item">
+                            {{ loop.index }}. {{ note }}
+                        </div>
+
+                    {% endfor %}
+
+                {% else %}
+
+                    <p class="empty">
+                        No notes saved yet, Sir.
+                    </p>
+
+                {% endif %}
+
+            </div>
+
+        </section>
+
+    </main>
+
+</div>
+
+
+<script>
+
+function showSection(sectionName) {
+
+    document.querySelectorAll(".section").forEach(section => {
+        section.classList.remove("active-section");
+    });
+
+    document.getElementById(sectionName)
+        .classList.add("active-section");
+
+    document.querySelectorAll(".nav-item").forEach(button => {
+        button.classList.remove("active");
+    });
+
+    event.currentTarget.classList.add("active");
+}
+
+
+async function sendMessage() {
+
+    const input = document.getElementById("messageInput");
+    const message = input.value.trim();
+
+    if (!message) return;
+
+    addMessage("You", message, "user-message");
+
+    input.value = "";
+
+    try {
+
+        const response = await fetch("/chat", {
+
+            method: "POST",
+
+            headers: {
+                "Content-Type": "application/json"
+            },
+
+            body: JSON.stringify({
+                message: message
+            })
+
+        });
+
+        const data = await response.json();
+
+        addMessage(
+            "MANTRA",
+            data.reply,
+            "mantra-message"
+        );
+
+    } catch (error) {
+
+        addMessage(
+            "MANTRA",
+            "Sorry Sir, I couldn't connect to the MANTRA engine.",
+            "mantra-message"
+        );
+
+    }
+}
+
+
+function addMessage(sender, text, className) {
+
+    const chatBox = document.getElementById("chatBox");
+
+    const messageDiv = document.createElement("div");
+
+    messageDiv.className =
+        "message " + className;
+
+    const avatar =
+        sender === "MANTRA" ? "M" : "S";
+
+    messageDiv.innerHTML = `
+
+        <div class="avatar">
+            ${avatar}
+        </div>
+
+        <div class="bubble">
+
+            <div class="sender">
+                ${sender}
+            </div>
+
+            ${text}
+
+        </div>
+
+    `;
+
+    chatBox.appendChild(messageDiv);
+
+    chatBox.scrollTop = chatBox.scrollHeight;
+}
+
+
+document.getElementById("messageInput")
+    .addEventListener("keydown", function(event) {
+
+        if (event.key === "Enter") {
+            sendMessage();
+        }
+
+    });
+
+</script>
+
+</body>
+</html>
